@@ -18,8 +18,12 @@ class ReplayBuffer(object):
 
     def add_entry(self, state, action, reward, next_state, done):
         if self.state_buffer.shape[0] >= self.max_size:
-            for buffer in self.all_buffers:
-                buffer = buffer[1:]
+                self.state_buffer = self.state_buffer[1:]
+                self.action_buffer = self.action_buffer[1:]
+                self.reward_buffer = self.reward_buffer[1:]
+                self.next_state_buffer = self.next_state_buffer[1:]
+                self.done_buffer = self.done_buffer[1:]
+
         self.state_buffer = torch.cat(
             (self.state_buffer, torch.from_numpy(state).reshape(1,-1)),dim=0)
         self.action_buffer = torch.cat(
@@ -32,7 +36,7 @@ class ReplayBuffer(object):
             (self.done_buffer, torch.tensor([done], dtype=torch.int).reshape(1,-1)), dim=0)
     
     def sample(self, batch_size=1) -> dict:
-        indices = torch.randint(0, self.state_buffer.shape[1], size=(batch_size,1)).squeeze()
+        indices = torch.randint(0, self.state_buffer.shape[0], size=(batch_size,1)).squeeze()
         batch = (
             self.state_buffer[indices],
             self.action_buffer[indices],
