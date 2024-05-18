@@ -11,9 +11,6 @@ class ReplayBuffer(object):
         self.next_state_buffer = torch.empty((0, state_dim))
         self.done_buffer = torch.empty((0, 1), dtype=torch.int)
         
-        self.all_buffers = [
-            self.state_buffer, self.action_buffer, self.reward_buffer,
-            self.next_state_buffer, self.done_buffer]
         self.max_size = max_size
 
     def add_entry(self, state, action, reward, next_state, done):
@@ -27,7 +24,7 @@ class ReplayBuffer(object):
         self.state_buffer = torch.cat(
             (self.state_buffer, torch.from_numpy(state).reshape(1,-1)),dim=0)
         self.action_buffer = torch.cat(
-            (self.action_buffer, torch.tensor([action]).reshape(1,-1)), dim=0)
+            (self.action_buffer, action.reshape(1,-1)), dim=0)
         self.reward_buffer = torch.cat(
             (self.reward_buffer, torch.tensor([reward], dtype=torch.float32).reshape(1,-1)), dim=0)
         self.next_state_buffer = torch.cat(
@@ -113,7 +110,7 @@ class DiscreteActor(nn.Module):
     def act(self, state, noise=0):
         probs = F.softmax(self.forward(state) + noise, dim=-1)
         #action = Categorical(probs.cpu()).sample()
-        action = torch.argmax(gumbel_softmax(probs, hard=True), dim=1)
+        action = gumbel_softmax(probs, hard=True)
         return action#.item()
 
 """
