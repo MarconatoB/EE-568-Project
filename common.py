@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Categorical
+from torch.distributions import Categorical, Normal
 
 class ReplayBuffer(object):
     def __init__(self, state_dim, action_dim, max_size):
@@ -60,10 +60,14 @@ class Critic(nn.Module):
         q = F.relu(self.l2(q))
         q = self.l3(q)
         return q
-        #return self.SpinningUp(state_action)
+
 
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, min_action, max_action, hidden_dim=256):
+        """
+        TD3 policy
+        ---------
+        """
         super(Actor, self).__init__()
 
         self.l1 = nn.Linear(state_dim, hidden_dim)
@@ -86,6 +90,7 @@ class Actor(nn.Module):
         a = self.forward(state) + noise
         action = torch.clamp(
             a*action_range + self.min_action, min=self.min_action, max=self.max_action)
+
         return action
 
 class DiscreteActor(nn.Module):
@@ -111,6 +116,7 @@ class DiscreteActor(nn.Module):
         probs = F.softmax(self.forward(state) + noise, dim=-1)
         #action = Categorical(probs.cpu()).sample()
         action = gumbel_softmax(probs, hard=True)
+        
         return action#.item()
 
 """
@@ -157,5 +163,57 @@ def gumbel_softmax(logits, temperature=1.0, hard=False):
         y_hard = F.one_hot(torch.argmax(logits, dim=1), num_classes=logits.shape[1])
         y = (y_hard-y).detach() + y
     return y 
+
+
+
+LOG_SIG_MAX = 2
+LOG_SIG_MIN = -20
+EPSILON = 1e-6
+
+class SoftActor(nn.Module):
+    def __init__(self, state_dim, action_dim, min_action, max_action, hidden_dim=256):
+        """
+        Soft Actor-Critic policy
+        ------------------------
+        """
+        super(SoftActor, self).__init__()
+
+        self.l1 = nn.Linear(state_dim, hidden_dim)
+        self.l2 = nn.Linear(hidden_dim, hidden_dim)
+
+        self.mean_linear = nn.Linear(hidden_dim, action_dim)
+        self.log_std_linear = nn.Linear(hidden_dim, action_dim)
+
+        self.max_action = max_action
+        self.min_action = min_action
+        self.action_scale = (self.max_action - self.min_action)/2
+        self.action_bias  = (self.max_action + self.min_action)/2
+
+    def forward(self, state):
+        a = F.relu(self.l1(state))
+        a = F.relu(self.l2(a))
+        mean = self.mean_linear(a)
+        log_std = self.log_std_linear(a)
+        log_std = torch.clamp(log_std, min=LOG_SIG_MIN, max=LOG_SIG_MAX)
+
+        return mean, log_std
+
+    def sample(self, state):
+        mean, log_std = self.forward(state)
+        std = torch.exp(log_std)
+        normal = Normal(mean, std)
+        x_t = normal.rsample()
+        y_t = torch.tanh(x_t)
+        action = y_t*self.action_scale + self.action_bias
+        log_prob = normal.log_prob(x_t)
+        log_prob -= torch.log(self.action_scale * (1 - y_t.pow(2)) + EPSILON)
+        log_prob = log_prob.sum(1, keepdim=True)
+        mean = torch.tanh(mean) * self.action_scale + self.action_bias
+        return action, log_prob, mean
+
+    def act(self, state, evaluate=False):
+        action, _, mean = self.sample(state)
+
+        return action if evaluate is False else mean
 
     
