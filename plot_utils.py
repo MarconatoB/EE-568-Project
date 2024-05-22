@@ -95,12 +95,15 @@ if __name__ == '__main__':
             reward_agg, episodes_agg, critic_losses, actor_losses = aggregate_over_seeds(sac_result)
 
             episodes = np.arange(0, episodes_agg.shape[0])
-            plt.plot(np.nanmean(episodes_agg, axis=1), '.-', label='SAC', color='C0')
-            #plt.fill_between(episodes, episodes_reward, color='C0', alpha=0.2)
+            r_ep_mean = np.nanmean(episodes_agg, axis=1)
+            plt.plot(r_ep_mean, '.-', label='SAC', color='C0')
+            plt.fill_between(episodes, r_ep_mean, color='C0', alpha=0.2)
+            """
             plt.fill_between(
                 episodes,
                 np.nanmin(episodes_agg, axis=1), np.nanmax(episodes_agg, axis=1),
                 color='C0', alpha=0.1)
+            """
 
         with open(f"td3_{env_name}.obj", 'rb') as f:
             td3_result = pickle.load(f)
@@ -108,12 +111,15 @@ if __name__ == '__main__':
             reward_agg, episodes_agg, critic_losses, actor_losses = aggregate_over_seeds(td3_result)
 
             episodes = np.arange(0, episodes_agg.shape[0])
-            plt.plot(np.nanmean(episodes_agg, axis=1), '.-', label='TD3', color='C1')
-            #plt.fill_between(episodes, episodes_reward, color='C0', alpha=0.2)
+            r_ep_mean = np.nanmean(episodes_agg, axis=1)
+            plt.plot(r_ep_mean, '.-', label='TD3', color='C1')
+            plt.fill_between(episodes, r_ep_mean, color='C0', alpha=0.2)
+            """
             plt.fill_between(
                 episodes,
                 np.nanmin(episodes_agg, axis=1), np.nanmax(episodes_agg, axis=1),
                 color='C1', alpha=0.1)
+            """
         
         plt.xlabel("Episode")
         plt.ylabel("Total episode reward")
